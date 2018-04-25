@@ -1,0 +1,421 @@
+---
+title: "Air Pollutants Released by U.S. Facilities"
+date: false
+output:
+  html_document:
+    code_folding: hide
+    fig_height: 7
+    fig_width: 10
+    number_sections: no
+    smart: no
+    toc: no
+  pdf_document:
+    toc: yes
+
+---
+
+```{r echo=FALSE}
+options(width=100)
+knitr::opts_chunk$set(echo = FALSE,message=FALSE,warning=FALSE)
+```
+
+```{r}
+#load packages and csv file
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(ggthemes)
+library(RColorBrewer)
+library(ggrepel)
+library(reshape2)
+library(choroplethr)
+```
+
+
+```{r}
+df<-read.csv('air_pollution_all_facilities.csv',sep=',',stringsAsFactors=F)
+```
+
+```{r}
+colnames(df)<-c("ID","Facility.name","Rank.TRI.14","Rank.GHG.14","Latitude","Longitude","Address","City","State","ZIP","County","FIPS","Primary.NAICS","Second.primary.NAICS","Third.primary.NAICS","Industry.type","Parent.companies.2014.GHG","Parent.companies.2014.TRI","TRI.air.emissions.14","TRI.air.emissions.13","TRI.air.emissions.12","TRI.air.emissions.11","TRI.air.emissions.10","GHG.direct.emissions.14","GHG.direct.emissions.13","GHG.direct.emissions.12","GHG.direct.emissions.11","GHG.direct.emissions.10","GHG.ID","Second.GHG.ID","Third.GHG.ID","Fourth.GHG.ID","Fifth.GHG.ID","Sixth.GHG.ID","TRI.ID","Second.TRI.ID","Third.TRI.ID","Fourth.TRI.ID","Fifth.TRI.ID","FRS.ID","Second.FRS.ID","Third.FRS.ID","Fourth.FRS.ID")
+```
+
+```{r}
+convertValue<-function(x){
+	val<-0
+	if(x=='Not reported'){
+		val<-'NA'
+	}
+	else if(x!='Not reported'){
+		val<-as.numeric(gsub(",","",x))
+	}
+	return(val)
+}
+
+df[c(3:4,19:28)]<-lapply(df[c(3:4,19:28)], convertValue)
+```
+
+
+```{r,eval=F}
+naics_first_level<-data.frame(
+  "code"=c(11,21,22,23,31,32,33,42,43,44,45,48,49,51,52,53,54,55,56,61,62,71,72,81,92),
+  "industry.name" = c("Agriculture, Forestry, Fishing and Hunting", "Mining", "Utilities", "Construction", "Manufacturing", "Manufacturing", "Manufacturing", "Wholesale Trade", "Wholesale Trade", "Retail Trade", "Retail Trade", "Transportation and Warehousing", "Transportation and Warehousing", "Information", "Finance and Insurance", "Real Estate Rental and Leasing", "Professional, Scientific, and Technical Services", "Management of Companies and Enterprises", "Administrative and Support and Waste Management and Remediation Services", "Educational Services", "Health Care and Social Assistance", "Arts, Entertainment, and Recreation", "Accommodation and Food Services", "Other Services (except Public Administration)", "Public Administration"))
+```
+
+```{r,eval=T}
+  naics_first_level<-data.frame(
+  "code"=c(11,21,22,23,31,32,33,42,43,44,45,48,49,51,52,53,54,55,56,61,62,71,72,81,92),
+  "industry.name" = c("Agriculture,Forestry,Fishing and Hunting", "Mining", "Utilities", "Construction", "Manufacturing", "Manufacturing", "Manufacturing", "Wholesale Trade", "Wholesale Trade", "Retail Trade", "Retail Trade", "Transportation,Warehousing", "Transportation,Warehousing", "Information", "Finance,Insurance", "Real Estate Rental,Leasing", "Professional,Scientific,Technical Services", "Management of Companies and Enterprises", "Administrative,Support,WM,Remediation Services", "Educational Services", "Health Care,Social Assistance", "Arts,Entertainment,Recreation", "Accommodation,Food Services", "Other Services", "Public Administration")
+)
+
+naics_second_level<-data.frame(
+  "code" =c(111, 112, 113, 114, 115, 211, 212, 213, 221, 236, 237, 238, 311, 312, 313, 314, 315, 316, 321, 322, 323, 324, 325, 326, 327, 331, 332, 333, 334, 335, 336, 337, 339, 419, 441, 442, 443, 444, 445, 446, 447, 448, 451, 452, 453, 454, 481, 482, 483, 484, 485, 486, 487, 488, 491, 492, 493, 511, 512, 515, 517, 518, 519, 521, 522, 523, 524, 531, 532, 533, 541, 551, 561, 562, 611, 621, 622, 623, 624, 711, 712, 713, 721, 722, 811, 812, 813, 814),
+  "industry.name"=c("Crop Production", "Animal Production", "Forestry and Logging", "Fishing, Hunting and Trapping", "Support Activities for Agriculture and Forestry", "Oil and Gas Extraction", "Mining and Quarrying (except Oil and Gas)", "Support Activities for Mining and Oil and Gas Extraction", "Utilities", "Construction of Buildings", "Heavy and Civil Engineering Construction", "Specialty Trade Contractors", "Food Manufacturing", "Beverage and Tobacco Product Manufacturing", "Textile Mills", "Textile Product Mills", "Clothing Manufacturing", "Leather and Allied Product Manufacturing", "Wood Product Manufacturing", "Paper Manufacturing", "Printing and Related Support Activities", "Petroleum and Coal Product Manufacturing", "Chemical Manufacturing", "Plastics and Rubber Products Manufacturing", "Non-Metallic Mineral Product Manufacturing", "Primary Metal Manufacturing", "Fabricated Metal Product Manufacturing", "Machinery Manufacturing", "Computer and Electronic Product Manufacturing", "Electrical Equipment, Appliance and Component Manufacturing", "Transportation Equipment Manufacturing", "Furniture and Related Product Manufacturing", "Miscellaneous Manufacturing", "Wholesale Electronic Markets, and Agents and Brokers", "Motor Vehicle and Parts Dealers", "Furniture and Home Furnishings Stores", "Electronics and Appliance Stores", "Building Material and Garden Equipment and Supplies Dealers", "Food and Beverage Stores", "Health and Personal Care Stores", "Gasoline Stations", "Clothing and Clothing Accessories Stores", "Sporting Goods, Hobby, Book and Music Stores", "General Merchandise Stores", "Miscellaneous Store Retailers", "Non-Store Retailers", "Air Transportation", "Rail Transportation", "Water Transportation", "Truck Transportation", "Transit and Ground Passenger Transportation", "Pipeline Transportation", "Scenic and Sightseeing Transportation", "Support Activities for Transportation", "Postal Service", "Couriers and Messengers", "Warehousing and Storage", "Publishing Industries (except Internet)", "Motion Picture and Sound Recording Industries", "Broadcasting (except Internet)", "Telecommunications", "Data Processing, Hosting, and Related Services", "Other Information Services", "Monetary Authorities - Central Bank", "Credit Intermediation and Related Activities", "Securities, Commodity Contracts, and Other Financial Investment and Related Activities", "Insurance Carriers and Related Activities", "Real Estate", "Rental and Leasing Services", "Lessors of Non-Financial Intangible Assets (Except Copyrighted Works)", "Professional, Scientific and Technical Services", "Management of Companies and Enterprises", "Administrative and Support Services", "Waste Management and Remediation Services", "Educational Services", "Ambulatory Health Care Services", "Hospitals", "Nursing and Residential Care Facilities", "Social Assistance", "Performing Arts, Spectator Sports and Related Industries", "Heritage Institutions", "Amusement, Gambling and Recreation Industries", "Accommodation Services", "Food Services and Drinking Places", "Repair and Maintenance", "Personal and Laundry Services", "Religious, Grant-Making, Civic, and Professional and Similar Organizations", "Private Households"))
+```
+
+```{r}
+df$primary.industry <-sapply(as.integer(df$Primary.NAICS / 10000), function(x) naics_first_level$industry.name[match(x, naics_first_level$code)])
+df$second.industry <-sapply(as.integer(df$Primary.NAICS / 1000), function(x) naics_second_level$industry.name[match(x, naics_second_level$code)])
+```
+
+<br><br>
+
+![](main.png)
+
+<br>
+
+Each year, U.S. facilities generate around few dozen billion pounds of chemical waste. A major of these waste are categorized as toxic release because they might cause cancer or other chronic human health effects or significant adverse environmental effects. Another major part of these are believed to generate greenhouse gas that accelerates the climate change.  
+
+
+According to Environmental Protection Agency(EPA), over 20,000 facilities report their toxic release and greenhouse gas emission each year. But which industries are contributing the most?
+
+<br>
+
+```{r}
+subdf <- df %>% 
+  dplyr::group_by(primary.industry) %>% summarize(count=n()) %>% filter(rank(desc(count)) <= 15)
+
+subdf %>%
+  ggplot(aes(y=count,fill="#46ACC8",x=reorder(primary.industry,count))) + 
+  geom_bar(position = 'dodge', stat='identity') + coord_flip() + 
+  geom_text(aes(label=count), hjust=1.3, color="white", size=3.5) +
+  scale_y_log10() + labs(y = "number of facilities", x = "") +
+  theme(legend.position="none",axis.text.x = element_blank(), axis.ticks.y = element_line()) + ggtitle('Top 15 Number of Facilities classified by their primary type')
+```
+
+* log scale is used to shrink the gap between different categories
+* most of the data present here are for `Manufacturing`, `Utilities`, `Administrative and Support and Waste Management and Remediation Services`, `Mining` and `Wholesale Trade`
+
+Moreover, when looking at the `GHG` and `Tri` ranking, the number of facilities reporting this number decrease further more so in the next sections, I will focus on specific type of industries when looking at average quantities.
+
+<br><br>
+
+## Greenhouse Gas Release Rank by Industry
+```{r}
+df %>% select(primary.industry, Rank.GHG.14) %>% group_by(primary.industry) %>% 
+  ggplot(aes(x=primary.industry,y=Rank.GHG.14,fill=primary.industry)) +
+  geom_boxplot(colour='black',size=.4,alpha=.5) +
+  geom_jitter(shape=16,position=position_jitter(0.2),size=.25) + coord_flip() +
+  theme_fivethirtyeight() + 
+  scale_fill_manual(name="",values = colorRampPalette(brewer.pal(9,'Paired'))(20)) +
+  labs(subtitle="GHG ranking of facilities by primary industry",
+       subtitle="1 = large amount of emission") +
+    theme(plot.title=element_text(face="bold",hjust=-5,vjust=.8,colour="#3C3C3C",size=20),
+          plot.subtitle=element_text(size=10, hjust=0, face="italic", color="black"),
+          legend.position='None',legend.direction='horizontal',
+          legend.text = element_text(size=6),
+          legend.key.size = unit(.4,"cm"))
+```
+
+<br><br>
+
+## Toxic Release Rank by Industry
+```{r}
+df %>% select(primary.industry, Rank.TRI.14) %>% group_by(primary.industry) %>% 
+  ggplot(aes(x=primary.industry,y=Rank.TRI.14,fill=primary.industry)) +
+  geom_boxplot(colour='black',size=.4,alpha=.5) +
+  geom_jitter(shape=16,position=position_jitter(0.2),size=.25) + coord_flip() +
+  theme_fivethirtyeight() + 
+  scale_fill_manual(name="",values = colorRampPalette(brewer.pal(9,'Paired'))(20)) +
+  labs(title="TRI ranking of facilities by their primary type",
+       subtitle="1 = large amount of emission") +
+    theme(plot.title=element_text(face="bold",hjust=-4,vjust=.8,colour="#3C3C3C",size=20),
+          plot.subtitle=element_text(size=10, hjust=0, face="italic", color="black"),
+          legend.position='None',legend.direction='horizontal',
+          legend.text = element_text(size=6),
+          legend.key.size = unit(.4,"cm"))
+```
+
+<br><br><br>
+
+## `Manufacturing` ranking{.tabset .tabset-fade .tabset-pills}
+ 
+  <br>
+  
+### Greenhouse Gas Release
+
+```{r}
+df %>% filter(primary.industry=='Manufacturing') %>% ggplot(aes(x=Rank.GHG.14)) + geom_histogram(bins=100) + scale_y_log10() + facet_wrap(~second.industry,ncol=3) + theme_fivethirtyeight()
+```
+
+### Toxic Release
+```{r}
+df %>% filter(primary.industry=='Manufacturing') %>% ggplot(aes(x=Rank.TRI.14)) + geom_histogram(bins=100) + scale_y_log10() + facet_wrap(~second.industry,ncol=3) + theme_fivethirtyeight()
+```
+
+<br><br>
+
+## Facility Air Pollutants Release in 2014
+
+We've seen that the Facilities in this dataset are mostly about `Manufacturing`, `Utilities` and `Mining`. I define a new categories to disentangle between these 3 primary industries and the other, for plotting purposes.
+
+```{r}
+df$cat <- ifelse(df$primary.industry=='Manufacturing' | df$primary.industry=='Utilities' | df$primary.industry=='Mining','Manufacturing, Utilities, Mining','Others')
+```
+
+
+```{r}
+states_map<-map_data("state")
+usMap<-ggplot() + 
+  geom_map(data = states_map, map = states_map,aes(x = long, y = lat, map_id = region, group = group),fill = "black", color = "grey", size = 0.2) + theme_fivethirtyeight() + 
+  theme(panel.grid.major = element_blank(),
+        axis.text=element_blank(),axis.ticks=element_blank(),
+        legend.position = c(0.9, 0.02))
+
+world_map<-map_data("world")
+wMap<-ggplot() + 
+  geom_map(data = world_map, map = world_map,aes(x = long, y = lat, map_id = region, group = group),fill = "black", color = "grey", size = 0.2) + 
+  theme_fivethirtyeight() + theme(
+    panel.grid.major = element_blank(),
+    axis.text=element_blank(),
+    axis.ticks=element_blank(),
+    legend.position = c(0.9, 0.02))
+```
+
+<br>
+
+## Greenhouse Gas Emission Distribution{.tabset .tabset-fade .tabset-pills}
+
+<br>
+
+### Geographical Distribution
+
+```{r}
+mainMap<-usMap + 
+  geom_point(data=filter(df,Longitude < 0 & Longitude > -130 & Latitude > 20 & Latitude < 50),aes(x=Longitude,y=Latitude,color=cat,size=GHG.direct.emissions.14),alpha=.5) + theme_fivethirtyeight() +
+  scale_color_manual(name="",values=c("#c900ff","#fdff06")) +
+  labs(title="GHG air emissions; year 2014",
+       subtitle="unit : pounds\nAlaska, Hawaii territories not scaled") + theme(legend.title=element_blank(),legend.position = c(0.7, 1.06),panel.grid.major = element_blank(),axis.text=element_blank(),axis.ticks=element_blank())
+```
+
+```{r}
+HIMap<-wMap + geom_point(data=filter(df,State=='HI'),aes(x=Longitude,y=Latitude,color=cat,size=GHG.direct.emissions.14),alpha=.5) + theme_fivethirtyeight() +
+  scale_color_manual(name="",values=c("#c900ff","#fdff06")) + theme(legend.position='None',panel.grid.major = element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),plot.title=element_text(size=8)) +xlim(-162,-154) + ylim(18,23) + ggtitle("Hawaii")
+
+ALMap<-wMap + geom_point(data=filter(df,State=='AK'),aes(x=Longitude,y=Latitude,color=cat,size=GHG.direct.emissions.14),alpha=.5) + theme_fivethirtyeight() +
+  scale_color_manual(name="",values=c("#c900ff","#fdff06")) + theme(legend.position='None',panel.grid.major = element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),plot.title=element_text(size=8)) +xlim(-180,-130) + ylim(50,75) + ggtitle("Alaska")
+
+alaska<-ggplotGrob(ALMap)
+hawaii<-ggplotGrob(HIMap)
+```
+
+```{r}
+mainMap + annotation_custom(grob = alaska, xmin= -130, xmax=-118,ymin=21,ymax=30) + annotation_custom(grob = hawaii, xmin= -120, xmax=-108,ymin=21,ymax=30)
+```
+
+<br>
+
+### `Bad` player for Greenhouse Gas Rlease
+
+Looking at the relationship of Ranking and emission also reveals what type of industries are the main contributor for the `GHG` gas.
+
+
+```{r}
+df %>% ggplot(aes(x=GHG.direct.emissions.14,y=Rank.GHG.14)) + 
+  geom_point(aes(color=cat)) +
+  theme_fivethirtyeight() + 
+  scale_color_manual(name="",values=c("#46ACC8","#F21A00")) + 
+  labs(title="Facilities ranking vs. emissions for GHG",subtitle="For year 2014, emission in pounds") + 
+  theme(axis.text.x=element_text(size=8)) + 
+  geom_label_repel(
+    aes(label=ifelse(GHG.direct.emissions.14 > 1.6e7,as.character(paste0(Facility.name,"\n",primary.industry,"\n",City,",",State)),"")),
+    force=100,alpha=.85,size=3) + 
+  scale_x_log10() + scale_y_log10()
+```
+
+Again we see that the industries with larger emissions of `GHG` are `Manufacturing, Utilities, Mining`, resulting in some Facilities having a pretty bad rank. And the top 10 bad players can be seen from the chart.
+
+<br><br>
+
+## Toxic Emission Distribution{.tabset .tabset-fade .tabset-pills}
+
+### Geographical distribution
+
+```{r}
+mainMap<-usMap + 
+  geom_point(data=filter(df,Longitude < 0 & Longitude > -130 & Latitude > 20 & Latitude < 50),aes(x=Longitude,y=Latitude,color=cat,size=TRI.air.emissions.14),alpha=.5) + theme_fivethirtyeight() +
+  scale_color_manual(name="",values=c("#c900ff","#fdff06")) +
+  labs(title="TRI air emissions; year 2014",
+       subtitle="unit : tons\nAlaska, Hawaii territories not scaled") + theme(legend.title=element_blank(),legend.position = c(0.7, 1.06),panel.grid.major = element_blank(),axis.text=element_blank(),axis.ticks=element_blank())
+
+HIMap<-wMap + geom_point(data=filter(df,State=='HI'),aes(x=Longitude,y=Latitude,color=cat,size=TRI.air.emissions.14),alpha=.5) + theme_fivethirtyeight() +
+  scale_color_manual(name="",values=c("#c900ff","#fdff06")) + theme(legend.position='None',panel.grid.major = element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),plot.title=element_text(size=8)) +xlim(-162,-154) + ylim(18,23) + ggtitle("Hawaii")
+
+ALMap<-wMap + geom_point(data=filter(df,State=='AK'),aes(x=Longitude,y=Latitude,color=cat,size=TRI.air.emissions.14),alpha=.5) + theme_fivethirtyeight() +
+  scale_color_manual(name="",values=c("#c900ff","#fdff06")) + theme(legend.position='None',panel.grid.major = element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),plot.title=element_text(size=8)) +xlim(-180,-130) + ylim(50,75) + ggtitle("Alaska")
+
+alaska<-ggplotGrob(ALMap)
+hawaii<-ggplotGrob(HIMap)
+```
+
+```{r}
+mainMap + annotation_custom(grob = alaska, xmin= -130, xmax=-118,ymin=21,ymax=30) + annotation_custom(grob = hawaii, xmin= -120, xmax=-108,ymin=21,ymax=30)
+```
+
+<br>
+
+### `Bad` players for Toxic Rlease
+
+```{r}
+df %>% ggplot(aes(x=TRI.air.emissions.14,y=Rank.TRI.14)) + 
+  geom_point(aes(color=cat)) + scale_color_manual(name="",values=c("#46ACC8","#F21A00")) + 
+  theme_fivethirtyeight() + 
+  geom_label_repel(
+    aes(label=ifelse(TRI.air.emissions.14 > 5e6,as.character(paste0(Facility.name,"\n",primary.industry,"\n",City,",",State)),"")),
+    force=100,alpha=.85,size=3) + 
+  labs(title="Facilities ranking vs. emissions for TRI",subtitle="For year 14, emission in tons, log scale") + scale_x_log10() + scale_y_log10()
+```
+
+
+* it seems that the most responsible industries for `TRI` emission are `Manufacturing, Utilities and Mining`
+* the `GHG` emission seems more balanced between these two types of industries, however `Manufacturing, Utilities and Mining` have the larger contributors (in term of pounds)
+
+<br>
+
+## Gas emission from 2010 to 2014
+
+Sum the gas emission per industry, across all States
+
+### Toxic Emission
+
+```{r}
+TRI.sum<-data.frame(
+  df %>% dplyr::select(primary.industry,TRI.air.emissions.14 ,TRI.air.emissions.13, TRI.air.emissions.12, TRI.air.emissions.11, TRI.air.emissions.10) %>% 
+    dplyr::group_by(primary.industry) %>% na.omit() %>% 
+    dplyr::summarize(sum.TRI.10 = sum(TRI.air.emissions.10),
+              sum.TRI.11 = sum(TRI.air.emissions.11),
+              sum.TRI.12 = sum(TRI.air.emissions.12),
+              sum.TRI.13 = sum(TRI.air.emissions.13),
+              sum.TRI.14 = sum(TRI.air.emissions.14)))
+
+temp.tri<-data.frame(TRI.sum %>% dplyr::select(-primary.industry) %>% t())
+colnames(temp.tri)<-TRI.sum$primary.industry
+rownames(temp.tri)<-1:nrow(temp.tri)
+temp.tri$year<-c(2010:2014)
+temp.tri.melt<-reshape2::melt(temp.tri,id="year")
+```
+
+```{r}
+ggplot(temp.tri.melt,aes(factor(year),value,color=variable,group=variable)) + 
+  geom_line(size=2,alpha=1) + 
+  geom_point(size=1,color='black') + 
+  scale_y_log10() + 
+  scale_color_manual(name="",values = colorRampPalette(brewer.pal(9,'Paired'))(ncol(temp.tri)-1)) + 
+  theme_fivethirtyeight() + 
+  labs(title="Sum of TRI emission",
+       subtitle="in tons, across all States") + 
+  theme(legend.position='bottom',legend.direction='horizontal',legend.text = element_text(size=7))
+```
+
+* `Manufacturing`, `Utilities` are the 2 main contributors from 2010 to 2014, with no sign of decrease
+* `Agriculture` went from 70k  to ~2800 tons in 5 years
+* `Management` decreasd its emission almost close to 0 !
+* `Construction` almost doubled its emission between 2013 to 2014
+
+<br>
+
+### Greenhouse Gas Emission
+
+```{r}
+GHG.sum<-data.frame(
+  df %>% dplyr::select(primary.industry,GHG.direct.emissions.14,GHG.direct.emissions.13,
+                GHG.direct.emissions.12,GHG.direct.emissions.11,GHG.direct.emissions.10) %>% 
+    dplyr::group_by(primary.industry) %>% na.omit() %>% 
+    dplyr::summarize(sum.GHG.10 = sum(GHG.direct.emissions.10),
+              sum.GHG.11 = sum(GHG.direct.emissions.11),
+              sum.GHG.12 = sum(GHG.direct.emissions.12),
+              sum.GHG.13 = sum(GHG.direct.emissions.13),
+              sum.GHG.14 = sum(GHG.direct.emissions.14)))
+
+temp.ghg<-data.frame(GHG.sum %>% dplyr::select(-primary.industry) %>% t())
+colnames(temp.ghg)<-GHG.sum$primary.industry
+rownames(temp.ghg)<-1:nrow(temp.ghg)
+temp.ghg$year<-c(2010:2014)
+temp.ghg.melt<-reshape2::melt(temp.ghg,id="year")
+```
+
+```{r}
+ggplot(temp.ghg.melt,aes(factor(year),value,color=variable,group=variable)) + 
+  geom_line(size=2,alpha=1) + 
+  geom_point(size=1,color='black') + 
+  scale_y_log10() + 
+  scale_color_manual(name="",values = colorRampPalette(brewer.pal(9,'Paired'))(ncol(temp.ghg)-1)) + 
+  theme_fivethirtyeight() + 
+  labs(title="Sum of GHG emission",
+       subtitle="in pounds, across all States") + 
+  theme(legend.position='bottom',legend.direction='horizontal',legend.text = element_text(size=7))
+```
+
+* `Manufacturing`, `Utilities` are (again) the two main contributors from 2010 to 2014, with no sign of decrease
+* `Finance` did a great job by decreasing its GHG emission to <1000 pounds
+
+<br><br>
+
+## Gas Emission per State
+
+Although the idea of gas per State is not appropriate (gas are not contained to state limits), we can however get an idea of which States has the lerger initial gas emission, by summing all Facilities values within a State.
+
+
+```{r}
+listPlot<-list()
+cnt<-1
+
+makeMap<-function(temp,year,gaz){
+  temp$region<-sapply(temp$State, function(x) tolower(state.name[match(x, state.abb)]))
+  tt<-temp %>% dplyr::select(region,value) %>% na.omit() %>% dplyr::arrange(region)
+  choro = StateChoropleth$new(tt)
+  if(gaz=='GHG'){
+    choro$title  = paste0(2000 + year," GHG emission")
+    choro$ggplot_scale = scale_fill_manual(name="pounds", values = rev(viridis::magma(10)),drop=FALSE)
+  }
+  else if(gaz=='TRI'){
+    choro$title  = paste0(2000 + year," TRI emission")
+    choro$ggplot_scale = scale_fill_manual(name="tons", values = rev(viridis::magma(10)),drop=FALSE)
+  }
+  return(choro$render())
+}
+
+gaz_name<-c('TRI.air.emissions.','GHG.direct.emissions.')
+for(gg in 1:length(gaz_name)){
+  for (i in 10:14){
+    x<-paste0(gaz_name[gg],i)
+    temp<-df %>% dplyr::select(State,.dots=x) %>% dplyr::group_by(State) %>% na.omit() %>% dplyr::summarize(value = sum(.dots))
+    if(grepl('TRI',x) == TRUE){
+      listPlot[[cnt]]<-makeMap(temp,i,'TRI')
+    }
+    else {
+      listPlot[[cnt]]<-makeMap(temp,i,'GHG')
+    }
+    cnt<-cnt+1
+  }
+}
+```
+
+```{r fig.width=10, fig.height=16, fig.align='center',eval=T}
+grid.arrange(listPlot[[1]],listPlot[[6]],
+             listPlot[[2]],listPlot[[7]],
+             listPlot[[3]],listPlot[[8]],
+             listPlot[[4]],listPlot[[9]],
+             listPlot[[5]],listPlot[[10]],ncol=2)
+```
+
